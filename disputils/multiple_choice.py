@@ -92,7 +92,7 @@ class MultipleChoice(Dialog):
         emojis = self._generate_emojis()
 
         for i in range(len(self.options)):
-            config_embed.add_field(name=emojis[i], value=self.options[i], inline=False)
+            config_embed.add_field(name="\u200b", value=f"{emojis[i]} - {self.options[i]}", inline=False)
 
         self._embed = config_embed
         return config_embed
