@@ -219,5 +219,8 @@ class BotMultipleChoice(MultipleChoice):
 
         if self.message is None and channel is None:
             channel = self._ctx.channel
+        
+        if users is None:
+            users = self._ctx.author
 
         return await super().run(users, channel, **kwargs)
