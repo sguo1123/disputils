@@ -221,6 +221,6 @@ class BotMultipleChoice(MultipleChoice):
             channel = self._ctx.channel
         
         if users is None:
-            users = self._ctx.author
+            users = [self._ctx.author]
 
         return await super().run(users, channel, **kwargs)
