@@ -44,7 +44,10 @@ class Dialog(ABC):
         else:
             await self.display(text)
             try:
-                await self.message.clear_reactions()
+                if self.message.reactions:
+                    await self.message.clear_reactions()
+                if self.message.components:
+                    await self.message.edit(components=[])
             except errors.Forbidden:
                 pass
 
@@ -70,7 +73,7 @@ class Dialog(ABC):
 
         await self.display(embed=self._embed)
 
-    async def display(self, text: str = None, embed: Embed = None):
+    async def display(self, text: str = None, embed: Embed = None, **kwargs):
         """
         This will edit the dialog message.
 
@@ -79,4 +82,4 @@ class Dialog(ABC):
         :rtype: ``None``
         """
 
-        await self.message.edit(content=text, embed=embed)
+        await self.message.edit(content=text, embed=embed, **kwargs)

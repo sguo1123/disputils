@@ -1,4 +1,5 @@
 import discord
+from discord_components import Button, ButtonStyle
 from discord.ext import commands
 import asyncio
 from copy import deepcopy
@@ -10,7 +11,7 @@ from .abc import Dialog
 ControlEmojis = namedtuple(
     "ControlEmojis",
     ("first", "previous", "next", "last", "close"),
-    defaults=("⏮", "◀", "▶", "⏭", "⏹"),
+    defaults=("⏮", "⬅️", "➡️", "⏭", "⏹"),
 )
 
 
@@ -86,6 +87,12 @@ class EmbedPaginator(Dialog):
                     )
         return pages
 
+    def generate_buttons(self):
+        b = [Button(emoji=control_emoji, style=ButtonStyle.blue) for control_emoji in self.control_emojis]
+        b[0].disabled, b[1].disabled = True, True
+        return [b]
+
+
     async def run(
         self,
         users: List[discord.User],
@@ -123,49 +130,50 @@ class EmbedPaginator(Dialog):
 
         if len(self.pages) == 1:  # no pagination needed in this case
             await self._publish(channel, content=text, embed=self._embed)
+
             return
 
+        buttons = self.generate_buttons()
         channel = await self._publish(
-            channel, content=text, embed=self.formatted_pages[0]
+            channel, content=text, embed=self.formatted_pages[0], components=buttons
         )
         current_page_index = 0
 
-        for emoji in self.control_emojis:
-            if emoji is not None:
-                await self.message.add_reaction(emoji)
-
-        def check(r: discord.RawReactionActionEvent):
-            res = (r.message_id == self.message.id) and (
-                str(r.emoji) in self.control_emojis
-            )
-
-            if len(users) > 0:
-                res = res and r.user_id in [u1.id for u1 in users]
-
-            return res
+        def check(r):
+            if r.message.id == self.message.id:
+                if r.user.id in [u1.id for u1 in users]:
+                    return True
+                else:
+                    self._client.loop.create_task(r.respond(type=6))
+                    return False
+            else:
+                return False
 
         while True:
             try:
-                reaction = await self._client.wait_for(
-                    "raw_reaction_add", check=check, timeout=timeout
+                interaction = await self._client.wait_for(
+                    "button_click", check=check, timeout=timeout
                 )
             except asyncio.TimeoutError:
                 if not isinstance(
                     channel, discord.channel.DMChannel
                 ) and not isinstance(channel, discord.channel.GroupChannel):
                     try:
-                        await self.message.clear_reactions()
+                        await self.message.edit(components=[])
                     except discord.Forbidden:
                         pass
                 if "timeout_msg" in kwargs:
-                    await self.display(kwargs["timeout_msg"])
+                    await self.display(kwargs["timeout_msg"], components=[])
+                else:
+                    await self.message.edit(components=[])
                 return
 
-            emoji = str(reaction.emoji)
+            emoji = str(interaction.component.emoji)
             max_index = len(self.pages) - 1  # index for the last page
 
             if emoji == self.control_emojis[0]:
                 load_page_index = 0
+                buttons[0][0].disabled, buttons[0][1].disabled, buttons[0][2].disabled, buttons[0][3].disabled = True, True, False, False
 
             elif emoji == self.control_emojis[1]:
                 load_page_index = (
@@ -173,6 +181,12 @@ class EmbedPaginator(Dialog):
                     if current_page_index > 0
                     else current_page_index
                 )
+                if load_page_index == 0:
+                    buttons[0][0].disabled, buttons[0][1].disabled, buttons[0][2].disabled, buttons[0][3].disabled = True, True, False, False
+                else:
+                    buttons[0][0].disabled, buttons[0][1].disabled, buttons[0][2].disabled, buttons[0][3].disabled = False, False, False, False
+
+
 
             elif emoji == self.control_emojis[2]:
                 load_page_index = (
@@ -180,20 +194,22 @@ class EmbedPaginator(Dialog):
                     if current_page_index < max_index
                     else current_page_index
                 )
+                if load_page_index == max_index:
+                    buttons[0][0].disabled, buttons[0][1].disabled, buttons[0][2].disabled, buttons[0][3].disabled = False, False, True, True
+                else:
+                    buttons[0][0].disabled, buttons[0][1].disabled, buttons[0][2].disabled, buttons[0][3].disabled = False, False, False, False
+
 
             elif emoji == self.control_emojis[3]:
                 load_page_index = max_index
+                buttons[0][0].disabled, buttons[0][1].disabled, buttons[0][2].disabled, buttons[0][3].disabled = False, False, True, True
+
 
             else:
                 await self.quit(kwargs.get("quit_msg"))
                 return
 
-            await self.display(text, self.formatted_pages[load_page_index])
-            if reaction.member:
-                try:
-                    await self.message.remove_reaction(emoji, reaction.member)
-                except discord.Forbidden:
-                    pass
+            await interaction.respond(text=text, embed=self.formatted_pages[load_page_index], components=buttons, type=7)
 
             current_page_index = load_page_index
 
