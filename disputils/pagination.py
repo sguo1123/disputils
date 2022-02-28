@@ -209,7 +209,7 @@ class EmbedPaginator(Dialog):
                 await self.quit(kwargs.get("quit_msg"))
                 return
 
-            await interaction.respond(text=text, embed=self.formatted_pages[load_page_index], components=buttons, type=7)
+            await interaction.respond(embed=self.formatted_pages[load_page_index], components=buttons, type=7)
 
             current_page_index = load_page_index
 
